@@ -3,5 +3,10 @@ project(CPPServer)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_executable(server server.cc)
-add_executable(client client.cc)
+add_executable(server server.cpp util.cpp)
+add_executable(client client.cpp util.cpp)
+
+add_custom_target( cln
+    COMMAND ${CMAKE_COMMAND} -E remove server client
+    COMMENT "Clean"
+)
