@@ -29,24 +29,34 @@ int main() {
     Epoll *ep = new Epoll();
 
     serv_sock -> setnonblocking();
-    ep->addFd(serv_sock->getFd(), EPOLLIN|EPOLLET);
+    //ep->addFd(serv_sock->getFd(), EPOLLIN|EPOLLET);
+    
+    Channel *servChannel = new Channel(ep, serv_sock -> getFd());
+    servChannel -> enableReading();
+    
+
+
 
     while (true){
-        std::vector<epoll_event> events = ep->poll();
-        int nfds = events.size();
+        std::vector<Channel*> active_channels = ep->poll();
+        int nfds = active_channels.size();
         for(int i = 0; i < nfds; ++i){
-            if(events[i].data.fd == serv_sock->getFd()){        
-                InetAddress *clnt_addr = new InetAddress();    
-                Socket *clnt_sock = new Socket(serv_sock->accept(clnt_addr));     
+            int chfd = active_channels[i]->getFd();
+            
+            if(chfd == serv_sock->getFd()){ // new connection
+                InetAddress *client_addr = new InetAddress();
+                Socket *clnt_sock = new Socket(serv_sock->accept(client_addr));
+                printf("new client fd %d! IP: %s Port: %d\n", clnt_sock->getFd(), inet_ntoa(client_addr->addr.sin_addr), ntohs(client_addr->addr.sin_port));
                 
-                printf("new client fd %d! IP: %s Port: %d\n", clnt_sock->getFd(), inet_ntoa(clnt_addr->addr.sin_addr), ntohs(clnt_addr->addr.sin_port));
                 clnt_sock->setnonblocking();
-                ep->addFd(clnt_sock->getFd(), EPOLLIN | EPOLLET);
-            } else if(events[i].events & EPOLLIN){      
-                handleReadEvent(events[i].data.fd);
-            } else{        
-                printf("something else happened\n");
+                Channel *clntChannel = new Channel(ep, clnt_sock->getFd());
+                clntChannel -> enableReading();
+            } else if(active_channels[i]->getRevents() & EPOLLIN){ //Read event
+                handleReadEvent(active_channels[i]->getFd());
+            }else{
+                printf("unknown event\n");
             }
+            
         }
     }
     delete serv_addr;
