@@ -34,8 +34,8 @@ void Socket::setnonblocking(){
     errif(fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK) == -1, "Socket Set Nonblocking Error");
 }
 
-int Socket::accept(InetAddress& addr){
-    int conn_fd = ::accept(fd, (struct sockaddr*)&addr.addr, &addr.addr_len);
+int Socket::accept(InetAddress* addr){
+    int conn_fd = ::accept(fd, (struct sockaddr*)&addr->addr, &addr->addr_len);
     errif(conn_fd == -1, "Socket Accept Error");
     return conn_fd;
 }

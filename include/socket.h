@@ -15,7 +15,7 @@ class Socket{
 
         void setnonblocking();
 
-        int accept(InetAddress& addr);
+        int accept(InetAddress* addr);
 
         int getFd();
 
