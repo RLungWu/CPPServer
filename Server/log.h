@@ -9,6 +9,7 @@
 #include <string>
 #include <sys/types.h>
 #include <list>
+#include <vector>
 
 
 
@@ -19,6 +20,14 @@ public:
     using ptr = std::shared_ptr<LogEvent>;
 
     LogEvent();
+
+    const char* getFile() const {return m_file_;}
+    int32_t getLine() const {return m_line_;}
+    uint32_t getElapse() const {return m_elapse_;}
+    uint32_t getThreadId() const {return m_threadId_;}
+    uint32_t getFiberId() const {return m_fiberId_;}
+    uint64_t getTime() const {return m_time_;}
+    const std::string& getContent() const {return m_content_;}
 private:
     const char* m_file_ = nullptr;      // File Name
     int32_t m_line_ = 0;                // Line Number
@@ -45,7 +54,19 @@ public:
     using ptr = std::shared_ptr<LogFormatter>;
     
     std::string format(LogEvent::ptr event);
+    LogFormatter(const std::string& pattern);
+    void init();
 private:
+    class FormatItem{
+    public:
+        using ptr = std::shared_ptr<FormatItem>;
+        virtual ~FormatItem(){};
+        virtual void format(std::ostream& os, LogEvent::ptr event) = 0;
+    };
+
+private:
+    std::vector<FormatItem::ptr>m_items_;
+    std::string m_pattern_;
 };
 
 // Log Output Place
