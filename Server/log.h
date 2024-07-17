@@ -1,16 +1,46 @@
 
-#ifndef CPPSERVER_SERVER_INCLUDE_LOG_H_
-#define CPPSERVER_SERVER_INCLUDE_LOG_H_
+#ifndef CPPSERVER_SERVER_LOG_H_
+#define CPPSERVER_SERVER_LOG_H_
 
 
 #include <cstdint>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <string>
 #include <sys/types.h>
 #include <list>
 #include <vector>
 #include <sstream>
+#include "util.h"
+#include "singleton.h"
+
+#define LOG_LEVEL(logger, level) \
+    if(logger->getLevel() <= level) \
+        myserver::LogEventWrap(myserver::LogEvent::ptr(new myserver::LogEvent(\
+        level, __FILE__, __LINE__, 0, \
+        myserver::GetThreadId(), myserver::GetFiberId(), time(0)))).getSS()
+
+#define LOG_DEBUG(logger) LOG_LEVEL(logger, myserver::LogLevel::DEBUG)
+#define LOG_INFO(logger) LOG_LEVEL(logger, myserver::LogLevel::INFO)
+#define LOG_WARN(logger) LOG_LEVEL(logger, myserver::LogLevel::WARN)
+#define LOG_ERROR(logger) LOG_LEVEL(logger, myserver::LogLevel::ERROR)
+#define LOG_FATAL(logger) LOG_LEVEL(logger, myserver::LogLevel::FATAL)
+
+#define LOG_FMT_LEVEL(logger, level, fmt, ...)\
+    if(logger->getLevel() <= level)\
+        myserver::LogEventWrap(myserver::LogEvent::ptr(new myserver::LogEvent(\
+        level, __FILE__, __LINE__, 0, \
+        myserver::GetThreadId(), myserver::GetFiberId(), time(0)))).getEvent()->format(fmt, __VA_ARGS__)
+
+#define LOG_FMT_DEBUG(logger, fmt, ...) LOG_FMT_LEVEL(logger, myserver::LogLevel::DEBUG, fmt, __VA_ARGS__)
+#define LOG_FMT_INFO(logger, fmt, ...) LOG_FMT_LEVEL(logger, myserver::LogLevel::INFO, fmt, __VA_ARGS__)
+#define LOG_FMT_WARN(logger, fmt, ...) LOG_FMT_LEVEL(logger, myserver::LogLevel::WARN, fmt, __VA_ARGS__)
+#define LOG_FMT_ERROR(logger, fmt, ...) LOG_FMT_LEVEL(logger, myserver::LogLevel::ERROR, fmt, __VA_ARGS__)
+#define LOG_FMT_FATAL(logger, fmt, ...) LOG_FMT_LEVEL(logger, myserver::LogLevel::FATAL, fmt, __VA_ARGS__)
+
+#define LOG_ROOT() myserver::LoggerMgr::GetInstance()->getRoot()
+
 
 
 
@@ -88,7 +118,9 @@ public:
     using ptr = std::shared_ptr<LogFormatter>;
     
     LogFormatter(const std::string& pattern);
-    std::string format(LogEvent::ptr event);
+    
+    //%t %thread_id %m %n
+    std::string format(std::shared_ptr<Logger> logger, LogLevel::Level level, LogEvent::ptr event);
     //void init();
 private:
     class FormatItem{
@@ -125,7 +157,7 @@ protected:
 
 
 // Log Output
-class Logger{
+class Logger : public std::enable_shared_from_this<Logger>{
 public:
     using ptr = std::shared_ptr<Logger>;
     
@@ -150,11 +182,13 @@ public:
     LogLevel::Level get_level() const { return m_level_; }
 
     void set_level(LogLevel::Level level) { m_level_ = level; }
+
+    const std::string& getName() const {return m_name_;}
 private:
     std::string m_name_;
     LogLevel::Level m_level_;            
     std::list<LogAppender::ptr> m_appenders_;       //Appender List
-
+    LogFormatter::ptr m_formatter;
 };
 
 //output to controller
@@ -162,9 +196,6 @@ class StdoutLogAppender : public LogAppender{
 public:
     using ptr = std::shared_ptr<StdoutLogAppender>;
     void log(LogLevel::Level level, LogEvent::ptr event) override;
-    
-private:
-
 };
 
 // Define appender which will output to file
@@ -173,19 +204,27 @@ public:
     using ptr = std::shared_ptr<FileLogAppender>;
     FileLogAppender(const std::string& filename);
     virtual void log(LogLevel::Level level, LogEvent::ptr event) override;
+
     bool reopen();
 private:
     std::string m_filename_;
     std::ofstream m_filestream_;
-
 };
 
+class LoggerManager{
+    public:
+        LoggerManager();
+        Logger::ptr getLogger(const std::string& name);
 
+        void init();
+        Logger::ptr getRoot() const {return m_root_;}
+    private:
+        std::map<std::string, Logger::ptr> m_loggers_;
+        Logger::ptr m_root_;
+};
 
-
+typedef myserver::Singleton<LoggerManager> LoggerMgr;
 
 }
-
-
 
 #endif
