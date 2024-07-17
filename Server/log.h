@@ -10,33 +10,13 @@
 #include <sys/types.h>
 #include <list>
 #include <vector>
+#include <sstream>
 
 
 
 namespace myserver{
 
-class LogEvent{
-public:
-    using ptr = std::shared_ptr<LogEvent>;
-
-    LogEvent();
-
-    const char* getFile() const {return m_file_;}
-    int32_t getLine() const {return m_line_;}
-    uint32_t getElapse() const {return m_elapse_;}
-    uint32_t getThreadId() const {return m_threadId_;}
-    uint32_t getFiberId() const {return m_fiberId_;}
-    uint64_t getTime() const {return m_time_;}
-    const std::string& getContent() const {return m_content_;}
-private:
-    const char* m_file_ = nullptr;      // File Name
-    int32_t m_line_ = 0;                // Line Number
-    uint32_t m_elapse_ = 0;             // Time Elapse
-    uint32_t m_threadId_ = 0;           //Thread id
-    uint32_t m_fiberId_ = 0;            //Fiber id
-    uint64_t m_time_ = 0;               //Time
-    std::string m_content_;
-};
+class Logger;
 
 class LogLevel{
 public:
@@ -47,15 +27,69 @@ public:
         ERROR = 4,
         FATAL = 5
     };
+
+    static const char* ToString(LogLevel::Level level);
 };
+
+
+
+class LogEvent{
+public:
+    using ptr = std::shared_ptr<LogEvent>;
+
+    LogEvent(LogLevel::Level level,
+            const char* file,
+            int32_t m_line,
+            uint32_t elapse,
+            uint32_t thread_id,
+            uint32_t fiber_id,
+            uint64_t time);
+
+    const char* getFile() const {return m_file_;}
+    int32_t getLine() const {return m_line_;}
+    uint32_t getElapse() const {return m_elapse_;}
+    uint32_t getThreadId() const {return m_threadId_;}
+    uint32_t getFiberId() const {return m_fiberId_;}
+    uint64_t getTime() const {return m_time_;}
+    std::string getContent() const {return m_ss_.str();}
+    std::shared_ptr<Logger> getLogger() const {return m_logger_;}
+    LogLevel::Level getLevel() const {return m_level_;}
+
+    std::stringstream& getSS() {return m_ss_;}
+    void format(const char* fmt, ...);
+    void format(const char* fmt, va_list al);
+private:
+    const char* m_file_ = nullptr;      // File Name
+    int32_t m_line_ = 0;                // Line Number
+    uint32_t m_elapse_ = 0;             // Time Elapse
+    uint32_t m_threadId_ = 0;           //Thread id
+    uint32_t m_fiberId_ = 0;            //Fiber id
+    uint64_t m_time_ = 0;               //Time
+    std::stringstream m_ss_;
+
+    std::shared_ptr<Logger> m_logger_;
+    LogLevel::Level m_level_;          //Log Level
+};
+
+class LogEventWrap{
+public:
+    LogEventWrap(LogEvent::ptr e);
+    ~LogEventWrap();
+
+    LogEvent::ptr getEvent() const {return m_event_;}
+    std::stringstream& getSS();
+private:
+    LogEvent::ptr m_event_;
+};
+
 
 class LogFormatter{
 public:
     using ptr = std::shared_ptr<LogFormatter>;
     
-    std::string format(LogEvent::ptr event);
     LogFormatter(const std::string& pattern);
-    void init();
+    std::string format(LogEvent::ptr event);
+    //void init();
 private:
     class FormatItem{
     public:
@@ -63,6 +97,8 @@ private:
         virtual ~FormatItem(){};
         virtual void format(std::ostream& os, LogEvent::ptr event) = 0;
     };
+
+    void init();
 
 private:
     std::vector<FormatItem::ptr>m_items_;
@@ -117,7 +153,7 @@ public:
 private:
     std::string m_name_;
     LogLevel::Level m_level_;            
-    LogAppender::ptr m_appenders_;       //Appender List
+    std::list<LogAppender::ptr> m_appenders_;       //Appender List
 
 };
 
@@ -125,9 +161,10 @@ private:
 class StdoutLogAppender : public LogAppender{
 public:
     using ptr = std::shared_ptr<StdoutLogAppender>;
-    virtual void log(LogLevel::Level level, LogEvent::ptr event) override;
+    void log(LogLevel::Level level, LogEvent::ptr event) override;
     
 private:
+
 };
 
 // Define appender which will output to file
